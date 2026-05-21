@@ -35,7 +35,7 @@ export const getAllAlumni = async(req,res)=>{
             FROM users
             JOIN alumni ON users.id = alumni.user_id;
         `;
-        res.json(result[0]);
+        res.json(result);
     } catch (error) {
         res.status(500).json({error: error.message});
     }
