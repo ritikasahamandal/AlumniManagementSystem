@@ -29,7 +29,7 @@ export const upsertAlumniProfile= async(req,res)=>{
 export const getAllAlumni = async(req,res)=>{
     try {
         const result= await sql`
-            SELECT users.id, users.name, users.email,
+            SELECT users.id, users.name, users.email, users.is_approved,
                 alumni.graduation_year, alumni.department,
                 alumni.company, alumni.job_title, alumni.location
             FROM users
