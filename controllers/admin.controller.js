@@ -51,3 +51,32 @@ export const deleteUser = async(req,res)=>{
         res.status(500).json({error:error.message});
     }
 };
+
+export const updateUserRole = async (
+  req,
+  res
+) => {
+
+  const { id } = req.params;
+
+  const { role } = req.body;
+
+  try {
+
+    await sql`
+      UPDATE users
+      SET role = ${role}
+      WHERE id = ${id};
+    `;
+
+    res.json({
+      message: "Role updated"
+    });
+
+  } catch (error) {
+
+    res.status(500).json({
+      error: error.message
+    });
+  }
+};

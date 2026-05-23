@@ -33,7 +33,8 @@ export const getAllAlumni = async(req,res)=>{
                 alumni.graduation_year, alumni.department,
                 alumni.company, alumni.job_title, alumni.location
             FROM users
-            JOIN alumni ON users.id = alumni.user_id;
+            JOIN alumni ON users.id = alumni.user_id
+            WHERE users.role = 'alumni';
         `;
         res.json(result);
     } catch (error) {
@@ -75,11 +76,12 @@ export const searchAlumni = async (req, res) => {
              alumni.company, alumni.job_title, alumni.location
       FROM users
       JOIN alumni ON users.id = alumni.user_id
+      WHERE users.role = 'alumni'
     `;
 
     if (conditions.length > 0) {
-      query += ` WHERE ` + conditions.join(" AND ");
-    }
+  query += ` AND ` + conditions.join(" AND ");
+}
 
     const result = await sql.query(query, values); 
 
