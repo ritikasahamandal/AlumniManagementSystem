@@ -6,35 +6,42 @@ export const upsertAlumniProfile = async (
 ) => {
 
   const {
-    degree,
-    department,
-    graduation_year,
 
     company,
     job_title,
     location,
+
+    course_name,
+    graduation_year,
+
   } = req.body;
 
   const user_id = req.user.id;
 
   try {
 
-    // UPSERT ALUMNI TABLE
+    // =====================
+    // UPDATE ALUMNI
+    // =====================
 
     await sql`
 
       INSERT INTO alumni (
+
         user_id,
         company,
         job_title,
         location
+
       )
 
       VALUES (
+
         ${user_id},
         ${company},
         ${job_title},
         ${location}
+
       )
 
       ON CONFLICT (user_id)
@@ -47,33 +54,86 @@ export const upsertAlumniProfile = async (
 
     `;
 
-    // INSERT EDUCATION TABLE
-    
-    const education = await sql`
+    // =====================
+    // GET COURSE
+    // =====================
 
-      INSERT INTO education (
-        user_id,
-        degree,
-        department,
+    let coursesData = await sql`
+
+      SELECT *
+      FROM courses
+
+      WHERE course_name =
+      ${course_name};
+
+    `;
+
+    let course;
+
+    // =====================
+    // CREATE COURSE
+    // =====================
+
+    if (coursesData.length === 0) {
+
+      const newCourse = await sql`
+
+        INSERT INTO courses (
+          course_name
+        )
+
+        VALUES (
+          ${course_name}
+        )
+
+        RETURNING *;
+
+      `;
+
+      course = newCourse[0];
+
+    } else {
+
+      course = coursesData[0];
+    }
+
+    // =====================
+    // INSERT RELATION
+    // =====================
+
+    await sql`
+
+      INSERT INTO alumni_courses (
+
+        alumni_id,
+        course_id,
         graduation_year
+
       )
 
       VALUES (
+
         ${user_id},
-        ${degree},
-        ${department},
+        ${course.course_id},
         ${graduation_year}
+
       )
 
-      RETURNING *;
+      ON CONFLICT (
+        alumni_id,
+        course_id
+      )
+
+      DO UPDATE SET
+
+        graduation_year =
+        EXCLUDED.graduation_year;
 
     `;
 
     res.json({
       message:
         "Profile updated successfully",
-
-      education: education[0],
     });
 
   } catch (error) {
@@ -81,7 +141,6 @@ export const upsertAlumniProfile = async (
     res.status(500).json({
       error: error.message,
     });
-
   }
 };
 
@@ -105,17 +164,21 @@ export const getAllAlumni = async (
         alumni.job_title,
         alumni.location,
 
-        education.degree,
-        education.department,
-        education.graduation_year
+        courses.course_name,
+
+        alumni_courses.graduation_year
 
       FROM users
 
       JOIN alumni
       ON users.id = alumni.user_id
 
-      JOIN education
-      ON users.id = education.user_id
+      JOIN alumni_courses
+      ON users.id = alumni_courses.alumni_id
+
+      JOIN courses
+      ON alumni_courses.course_id =
+         courses.course_id
 
       WHERE users.role = 'alumni';
 
@@ -128,7 +191,6 @@ export const getAllAlumni = async (
     res.status(500).json({
       error: error.message,
     });
-
   }
 };
 
@@ -141,53 +203,11 @@ export const searchAlumni = async (
   const {
     name,
     company,
-    department,
-    degree,
+    course_name,
     graduation_year,
   } = req.query;
 
   try {
-
-    let conditions = [];
-
-    if (name) {
-
-      conditions.push(
-        sql`users.name ILIKE ${"%" + name + "%"}`
-      );
-    }
-
-
-    if (company) {
-
-      conditions.push(
-        sql`alumni.company ILIKE ${"%" + company + "%"}`
-      );
-    }
-
-
-    if (department) {
-
-      conditions.push(
-        sql`education.department ILIKE ${"%" + department + "%"}`
-      );
-    }
-
-
-    if (degree) {
-
-      conditions.push(
-        sql`education.degree ILIKE ${"%" + degree + "%"}`
-      );
-    }
-
-
-    if (graduation_year) {
-
-      conditions.push(
-        sql`education.graduation_year = ${graduation_year}`
-      );
-    }
 
     const result = await sql`
 
@@ -196,34 +216,51 @@ export const searchAlumni = async (
         users.id,
         users.name,
         users.email,
+        users.role,
         users.is_approved,
 
         alumni.company,
         alumni.job_title,
         alumni.location,
 
-        education.degree,
-        education.department,
-        education.graduation_year
+        courses.course_name,
+
+        alumni_courses.graduation_year
 
       FROM users
 
       JOIN alumni
       ON users.id = alumni.user_id
 
-      JOIN education
-      ON users.id = education.user_id
+      JOIN alumni_courses
+      ON users.id = alumni_courses.alumni_id
+
+      JOIN courses
+      ON alumni_courses.course_id =
+         courses.course_id
 
       WHERE users.role = 'alumni'
 
-      ${conditions.length > 0
-        ? sql`
-            AND ${sql.join(
-              conditions,
-              sql` AND `
-            )}
-          `
-        : sql``}
+      AND (
+        ${!name}
+        OR users.name ILIKE ${"%" + name + "%"}
+      )
+
+      AND (
+        ${!company}
+        OR alumni.company ILIKE ${"%" + company + "%"}
+      )
+
+      AND (
+        ${!course_name}
+        OR courses.course_name ILIKE ${"%" + course_name + "%"}
+      )
+
+      AND (
+        ${!graduation_year}
+        OR alumni_courses.graduation_year =
+           ${graduation_year}
+      );
 
     `;
 
@@ -231,13 +268,16 @@ export const searchAlumni = async (
 
   } catch (error) {
 
+    console.error(
+      "SEARCH ERROR =>",
+      error.message
+    );
+
     res.status(500).json({
       error: error.message,
     });
-
   }
 };
-
 export const getMyProfile = async (
   req,
   res
@@ -258,29 +298,32 @@ export const getMyProfile = async (
         alumni.job_title,
         alumni.location,
 
-        education.degree,
-        education.department,
-        education.graduation_year
+        courses.course_name,
+
+        alumni_courses.graduation_year
 
       FROM users
 
       JOIN alumni
       ON users.id = alumni.user_id
 
-      JOIN education
-      ON users.id = education.user_id
+      JOIN alumni_courses
+      ON users.id = alumni_courses.alumni_id
+
+      JOIN courses
+      ON alumni_courses.course_id =
+         courses.course_id
 
       WHERE users.id = ${req.user.id};
 
     `;
 
-    res.json(profile[0]);
+    res.json(profile);
 
   } catch (error) {
 
     res.status(500).json({
       error: error.message,
     });
-
   }
 };
