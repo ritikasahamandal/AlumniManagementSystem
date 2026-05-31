@@ -318,7 +318,7 @@ export const getMyProfile = async (
 
     `;
 
-    res.json(profile);
+    res.json(profile[0]);
 
   } catch (error) {
 

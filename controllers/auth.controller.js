@@ -341,3 +341,35 @@ export const login = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+export const getMe = async (
+  req,
+  res
+) => {
+
+  try {
+
+    const user = await sql`
+
+      SELECT
+        id,
+        name,
+        email,
+        role
+
+      FROM users
+
+      WHERE id = ${req.user.id}
+
+    `;
+
+    res.json(user[0]);
+
+  } catch (error) {
+
+    res.status(500).json({
+      error: error.message,
+    });
+
+  }
+};
